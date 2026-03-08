@@ -39,6 +39,7 @@ class FluxGenerator:
         generator = torch.Generator(device=DEVICE).manual_seed(int(seed))
 
         try:
+            # Call pipeline
             result = self.pipe(
                 prompt=prompt,
                 width=width,
@@ -48,13 +49,40 @@ class FluxGenerator:
                 generator=generator,
             )
             
-            # Ensure we have images attribute
-            if not hasattr(result, 'images'):
-                raise ValueError(f"Pipeline returned unexpected result type: {type(result)}")
-            
-            images = result.images
+            # Handle different return types from FluxPipeline
+            # Some versions return an object with .images, others return a list/tuple directly
+            images = None
+            if hasattr(result, 'images'):
+                # Standard case: result is an object with images attribute
+                images = result.images
+            elif isinstance(result, (list, tuple)):
+                # Pipeline returned a list/tuple directly
+                # If it's a tuple, it might be (images, ...) or just images
+                if isinstance(result, tuple) and len(result) > 0:
+                    # Check if first element is a list of images
+                    if isinstance(result[0], (list, tuple)) and len(result[0]) > 0:
+                        if isinstance(result[0][0], Image.Image):
+                            images = result[0]
+                        else:
+                            images = result
+                    elif isinstance(result[0], Image.Image):
+                        # Tuple of Image objects
+                        images = result
+                    else:
+                        # Try to use the whole result
+                        images = result
+                else:
+                    images = result
+            else:
+                raise ValueError(
+                    f"Pipeline returned unexpected result type: {type(result)}, "
+                    f"hasattr(images): {hasattr(result, 'images') if hasattr(result, '__dict__') else 'N/A'}"
+                )
             
             # Validate that we have at least one image
+            if images is None:
+                raise ValueError("Failed to extract images from pipeline result")
+            
             if not images or len(images) == 0:
                 raise ValueError("Pipeline returned no images")
             
@@ -72,7 +100,12 @@ class FluxGenerator:
             return (img_bytes, int(seed))
         except Exception as e:
             # Re-raise the exception so it can be caught by the handler
-            raise RuntimeError(f"Image generation failed: {e}") from e
+            # Include the original exception type and message for debugging
+            error_msg = str(e)
+            error_type = type(e).__name__
+            raise RuntimeError(
+                f"Image generation failed: [{error_type}] {error_msg}"
+            ) from e
         finally:
             # Clear CUDA cache after generation to free up memory
             if torch.cuda.is_available():

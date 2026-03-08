@@ -76,10 +76,11 @@ async def _handle_single(inputs: Dict[str, Any]) -> Dict[str, Any]:
     if not prompt:
         return {"error": "Missing 'prompt' in input"}
 
-    width = int(inputs.get("width", 1024))
-    height = int(inputs.get("height", 1024))
+    width = int(inputs.get("width", 768))
+    height = int(inputs.get("height", 768))
     num_inference_steps = int(inputs.get("num_inference_steps", 4))
     guidance_scale = float(inputs.get("guidance_scale", 0.0))
+
     seed = inputs.get("seed")
 
     loop = asyncio.get_running_loop()

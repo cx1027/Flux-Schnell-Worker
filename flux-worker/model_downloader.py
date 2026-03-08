@@ -53,6 +53,59 @@ class FluxGenerator:
         return buf.getvalue(), int(seed)
 
 
+def ensure_main_model(model_id: Optional[str] = None, cache_dir: Optional[str] = None) -> None:
+    """
+    Ensure the main Flux model is present in the cache directory.
+
+    This is mainly used at container start to pre-download the model into
+    the RunPod volume so subsequent cold starts are faster.
+    """
+    if model_id is None:
+        model_id = MODEL_ID
+
+    if cache_dir is None:
+        cache_dir = VOLUME_CHECKPOINTS_DIR
+
+    # If no cache_dir or it doesn't exist, just trigger a normal load
+    if not cache_dir or not os.path.isdir(cache_dir):
+        print(f"Cache directory not found, downloading '{model_id}' to default HuggingFace cache...")
+        _ = FluxPipeline.from_pretrained(model_id, torch_dtype=TORCH_DTYPE)
+        print("Model download complete (default cache).")
+        return
+
+    # Use the same HF_HOME handling as load_model so cache is under volume
+    original_hf_home = os.environ.get("HF_HOME")
+    os.environ["HF_HOME"] = cache_dir
+
+    try:
+        # HuggingFace cache structure: {HF_HOME}/hub/models--{org}--{name}/
+        try:
+            org, name = model_id.split("/", 1)
+        except ValueError:
+            org, name = "models", model_id.replace("/", "--")
+
+        cache_model_dir = os.path.join(
+            cache_dir,
+            "hub",
+            f"models--{org}--{name.replace('/', '--')}",
+        )
+
+        print(f"Expected cache directory: {cache_model_dir}")
+
+        if os.path.isdir(cache_model_dir):
+            print(f"Model already exists in cache: {cache_model_dir}")
+            return
+
+        print("Downloading model to volume...")
+        _ = FluxPipeline.from_pretrained(model_id, torch_dtype=TORCH_DTYPE)
+        print(f"Model downloaded successfully to: {cache_model_dir}")
+    finally:
+        if original_hf_home is not None:
+            os.environ["HF_HOME"] = original_hf_home
+        elif "HF_HOME" in os.environ:
+            del os.environ["HF_HOME"]
+
+
 def load_model() -> FluxGenerator:
     original_hf_home = os.environ.get("HF_HOME")
 

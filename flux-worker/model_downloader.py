@@ -97,12 +97,19 @@ class FluxGenerator:
             img_bytes = buf.getvalue()
             
             # Ensure we return a tuple of exactly 2 values
-            return (img_bytes, int(seed))
+            result_tuple = (img_bytes, int(seed))
+            # Double-check that we're returning a tuple
+            if not isinstance(result_tuple, tuple) or len(result_tuple) != 2:
+                raise RuntimeError(
+                    f"Internal error: generate_image should return tuple of 2, got {type(result_tuple)} with length {len(result_tuple) if hasattr(result_tuple, '__len__') else 'N/A'}"
+                )
+            return result_tuple
         except Exception as e:
             # Re-raise the exception so it can be caught by the handler
             # Include the original exception type and message for debugging
             error_msg = str(e)
             error_type = type(e).__name__
+            # Make sure we don't accidentally return a single value - always raise
             raise RuntimeError(
                 f"Image generation failed: [{error_type}] {error_msg}"
             ) from e
@@ -215,7 +222,20 @@ def load_model() -> FluxGenerator:
     pipe.enable_sequential_cpu_offload()
 
     # Enable memory-efficient attention
-    pipe.enable_xformers_memory_efficient_attention()
+    # For Flux models, use SDPA (Scaled Dot Product Attention) instead of xformers
+    # because xformers doesn't support image_rotary_emb which Flux models use
+    # SDPA is built into PyTorch and supports rotary embeddings while being memory efficient
+    try:
+        if hasattr(pipe, "enable_sdpa"):
+            pipe.enable_sdpa()
+            print("SDPA (PyTorch) memory-efficient attention enabled (supports rotary embeddings)")
+        else:
+            # Fallback to xformers if SDPA is not available
+            pipe.enable_xformers_memory_efficient_attention()
+            print("xformers memory-efficient attention enabled (note: rotary embeddings may be ignored)")
+    except Exception as e:
+        print(f"Warning: Failed to enable memory-efficient attention: {e}")
+        print("Continuing with default attention (may use more memory)")
 
     # Enable VAE slicing to process VAE decoder in slices (reduces memory)
     if hasattr(pipe, "enable_vae_slicing"):

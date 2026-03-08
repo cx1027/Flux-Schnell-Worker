@@ -102,7 +102,7 @@ async def _handle_single(inputs: Dict[str, Any]) -> Dict[str, Any]:
 
     try:
         # Run heavy model inference in a thread to avoid blocking the event loop.
-        image_bytes, used_seed = await loop.run_in_executor(
+        result = await loop.run_in_executor(
             None,
             lambda: MODEL.generate_image(
                 prompt=prompt,
@@ -113,6 +113,20 @@ async def _handle_single(inputs: Dict[str, Any]) -> Dict[str, Any]:
                 seed=seed,
             ),
         )
+        # Validate that we got a tuple of 2 values before unpacking
+        if not isinstance(result, tuple) or len(result) != 2:
+            return {
+                "error": f"inference_failed: generate_image returned unexpected type: {type(result)}, length: {len(result) if hasattr(result, '__len__') else 'N/A'}"
+            }
+        image_bytes, used_seed = result
+    except ValueError as e:
+        # Specifically catch ValueError which might be the unpacking error
+        error_msg = str(e)
+        if "not enough values to unpack" in error_msg:
+            return {
+                "error": f"inference_failed: Unpacking error - {error_msg}. This suggests generate_image() returned an unexpected value."
+            }
+        return {"error": f"inference_failed: {error_msg}"}
     except Exception as e:  # pragma: no cover - defensive
         return {"error": f"inference_failed: {e}"}
 

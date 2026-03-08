@@ -2,7 +2,9 @@ runpod==1.8.1
 torch==2.3.0
 torchvision==0.18.0
 # FluxPipeline was introduced in newer diffusers versions; 0.29.2 does not export it.
-diffusers==0.30.3
+# Updated to 0.31.0 to fix "not enough values to unpack" error in attention mechanism
+# If issues persist, try 0.32.0 or later
+diffusers==0.31.0
 transformers==4.41.2
 accelerate==0.33.0
 # NOTE: xformers versions are tightly coupled to specific torch versions.

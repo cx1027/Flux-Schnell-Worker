@@ -38,22 +38,27 @@ class FluxGenerator:
 
         generator = torch.Generator(device=DEVICE).manual_seed(int(seed))
 
-        images = self.pipe(
-            prompt=prompt,
-            width=width,
-            height=height,
-            num_inference_steps=num_inference_steps,
-            guidance_scale=guidance_scale,
-            generator=generator,
-        ).images
+        try:
+            images = self.pipe(
+                prompt=prompt,
+                width=width,
+                height=height,
+                num_inference_steps=num_inference_steps,
+                guidance_scale=guidance_scale,
+                generator=generator,
+            ).images
 
-        image: Image.Image = images[0]
+            image: Image.Image = images[0]
 
-        buf = io.BytesIO()
-        image.save(buf, format="PNG")
-        img_bytes = buf.getvalue()
+            buf = io.BytesIO()
+            image.save(buf, format="PNG")
+            img_bytes = buf.getvalue()
 
-        return img_bytes, int(seed)
+            return img_bytes, int(seed)
+        finally:
+            # Clear CUDA cache after generation to free up memory
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
 
 def ensure_main_model(model_id: Optional[str] = None, cache_dir: Optional[str] = None) -> None:
@@ -154,9 +159,20 @@ def load_model() -> FluxGenerator:
                 del os.environ["HF_HOME"]
 
     # pipe = pipe.to(DEVICE)
-    pipe.enable_model_cpu_offload()
+    # Use sequential CPU offload for more aggressive memory management
+    # This offloads models to CPU one at a time, using less GPU memory
+    pipe.enable_sequential_cpu_offload()
 
+    # Enable memory-efficient attention
     pipe.enable_xformers_memory_efficient_attention()
+
+    # Enable VAE slicing to process VAE decoder in slices (reduces memory)
+    if hasattr(pipe, "enable_vae_slicing"):
+        pipe.enable_vae_slicing()
+
+    # Enable VAE tiling for large images (processes in tiles)
+    if hasattr(pipe, "enable_vae_tiling"):
+        pipe.enable_vae_tiling()
 
     # Disable safety checker if present to simplify output.
     if hasattr(pipe, "safety_checker"):

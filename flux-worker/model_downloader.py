@@ -39,22 +39,40 @@ class FluxGenerator:
         generator = torch.Generator(device=DEVICE).manual_seed(int(seed))
 
         try:
-            images = self.pipe(
+            result = self.pipe(
                 prompt=prompt,
                 width=width,
                 height=height,
                 num_inference_steps=num_inference_steps,
                 guidance_scale=guidance_scale,
                 generator=generator,
-            ).images
-
+            )
+            
+            # Ensure we have images attribute
+            if not hasattr(result, 'images'):
+                raise ValueError(f"Pipeline returned unexpected result type: {type(result)}")
+            
+            images = result.images
+            
+            # Validate that we have at least one image
+            if not images or len(images) == 0:
+                raise ValueError("Pipeline returned no images")
+            
             image: Image.Image = images[0]
+            
+            # Validate that we got a PIL Image
+            if not isinstance(image, Image.Image):
+                raise ValueError(f"Expected PIL Image, got {type(image)}")
 
             buf = io.BytesIO()
             image.save(buf, format="PNG")
             img_bytes = buf.getvalue()
-
-            return img_bytes, int(seed)
+            
+            # Ensure we return a tuple of exactly 2 values
+            return (img_bytes, int(seed))
+        except Exception as e:
+            # Re-raise the exception so it can be caught by the handler
+            raise RuntimeError(f"Image generation failed: {e}") from e
         finally:
             # Clear CUDA cache after generation to free up memory
             if torch.cuda.is_available():

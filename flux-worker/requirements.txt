@@ -10,3 +10,8 @@ accelerate==0.33.0
 xformers==0.0.26.post1
 Pillow==10.3.0
 boto3==1.35.0
+sentencepiece==0.2.0
+
+protobuf
+safetensors
+huggingface_hub

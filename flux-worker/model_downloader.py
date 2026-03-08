@@ -155,7 +155,9 @@ def load_model() -> FluxGenerator:
             elif "HF_HOME" in os.environ:
                 del os.environ["HF_HOME"]
 
-    pipe = pipe.to(DEVICE)
+    # pipe = pipe.to(DEVICE)
+    pipe.enable_model_cpu_offload()
+
     pipe.enable_xformers_memory_efficient_attention()
 
     # Disable safety checker if present to simplify output.

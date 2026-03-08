@@ -22,7 +22,6 @@ class FluxGenerator:
     def generate_image(
         self,
         prompt: str,
-        negative_prompt: Optional[str] = None,
         width: int = 1024,
         height: int = 1024,
         num_inference_steps: int = 20,
@@ -41,7 +40,6 @@ class FluxGenerator:
 
         images = self.pipe(
             prompt=prompt,
-            negative_prompt=negative_prompt,
             width=width,
             height=height,
             num_inference_steps=num_inference_steps,

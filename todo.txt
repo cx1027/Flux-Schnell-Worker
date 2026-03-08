@@ -1,0 +1,1 @@
+1.hanlder.py没有并发限制机制（如 Semaphore）

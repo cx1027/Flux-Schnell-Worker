@@ -92,7 +92,6 @@ async def _handle_single(inputs: Dict[str, Any]) -> Dict[str, Any]:
     if not prompt:
         return {"error": "Missing 'prompt' in input"}
 
-    negative_prompt = inputs.get("negative_prompt")
     width = int(inputs.get("width", 1024))
     height = int(inputs.get("height", 1024))
     num_inference_steps = int(inputs.get("num_inference_steps", 20))
@@ -107,7 +106,6 @@ async def _handle_single(inputs: Dict[str, Any]) -> Dict[str, Any]:
             None,
             lambda: MODEL.generate_image(
                 prompt=prompt,
-                negative_prompt=negative_prompt,
                 width=width,
                 height=height,
                 num_inference_steps=num_inference_steps,
@@ -143,7 +141,6 @@ async def handler(event: Dict[str, Any]) -> Dict[str, Any]:
     {
         "input": {
             "prompt": "a cute cat",
-            "negative_prompt": "low quality, blurry",
             "width": 1024,
             "height": 1024,
             "num_inference_steps": 20,
